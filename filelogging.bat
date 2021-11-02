@@ -1,0 +1,1 @@
+adb logcat | findstr QuestHook[qubes > log.txt

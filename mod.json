@@ -1,0 +1,30 @@
+{
+  "_QPVersion": "0.1.1",
+  "id": "qubes",
+  "name": "Qubes",
+  "version": "1.0.0",
+  "author": "Metalit",
+  "packageId": "com.beatgames.beatsaber",
+  "packageVersion": "1.17.1",
+  "modFiles": [
+    "libqubes.so"
+  ],
+  "libraryFiles": [
+    "libbeatsaber-hook_2_3_1.so"
+  ],
+  "dependencies": [],
+  "fileCopies": [
+    {
+      "name": "close.png",
+      "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/qubes/close.png"
+    },
+    {
+      "name": "lock.png",
+      "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/qubes/lock.png"
+    },
+    {
+      "name": "unlock.png",
+      "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/qubes/unlock.png"
+    }
+  ]
+}
