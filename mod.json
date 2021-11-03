@@ -25,6 +25,18 @@
     {
       "name": "unlock.png",
       "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/qubes/unlock.png"
+    },
+    {
+      "name": "closeActive.png",
+      "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/qubes/closeActive.png"
+    },
+    {
+      "name": "lockActive.png",
+      "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/qubes/lockActive.png"
+    },
+    {
+      "name": "unlockActive.png",
+      "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/qubes/unlockActive.png"
     }
   ]
 }

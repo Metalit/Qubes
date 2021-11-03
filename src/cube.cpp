@@ -106,7 +106,7 @@ void DefaultCube::init(UnityEngine::Color color, int cubeType, int onHit, float 
     type = cubeType;
 
     hitAction = onHit;
-    locked = false;
+    locked = lock;
     index = cfg_index;
     setColor(color);
     setSize(cubeSize);
@@ -437,39 +437,34 @@ void EditMenu::init(DefaultCube* parent) {
 
     // viewed settings change and lock/close buttons
     auto closeSprite = QuestUI::BeatSaberUI::FileToSprite(getDataDir(modInfo) + "close.png");
-    closeButton = QuestUI::BeatSaberUI::CreateUIButton(get_transform(), "", [this](){
+    auto closeSpriteActive = QuestUI::BeatSaberUI::FileToSprite(getDataDir(modInfo) + "closeActive.png");
+    closeButton = QuestUI::BeatSaberUI::CreateUIButton(get_transform(), "", "SettingsButton", [this](){
         this->get_gameObject()->set_active(false);
     });
-    QuestUI::BeatSaberUI::SetButtonSprites(closeButton, closeSprite, closeSprite);
-    // closeButton->GetComponentInChildren<TMPro::TextMeshProUGUI*>()->set_margin({-16.5, 0, 0, 0});
-    auto rect = reinterpret_cast<UnityEngine::RectTransform*>(closeButton->get_transform());
-    rect->set_anchoredPosition({32, 7});
-    rect->set_sizeDelta({8, 8});
+    QuestUI::BeatSaberUI::SetButtonSprites(closeButton, closeSprite, closeSpriteActive);
+    reinterpret_cast<UnityEngine::RectTransform*>(closeButton->get_transform())->set_anchoredPosition({32, 7});
+    reinterpret_cast<UnityEngine::RectTransform*>(closeButton->get_transform()->GetChild(0))->set_sizeDelta({5.5, 5.5});
 
     auto col_button = QuestUI::BeatSaberUI::CreateUIButton(get_transform(), "", "ColorPickerButtonSecondary", [this](){
         this->valVertical->get_gameObject()->set_active(!this->valVertical->get_gameObject()->get_active());
         this->colVertical->get_gameObject()->set_active(!this->colVertical->get_gameObject()->get_active());
     });
-    rect = reinterpret_cast<UnityEngine::RectTransform*>(col_button->get_transform());
-    rect->set_anchoredPosition({32, 0});
-    // rect->set_sizeDelta({8, 8});
+    reinterpret_cast<UnityEngine::RectTransform*>(col_button->get_transform())->set_anchoredPosition({32, 0});
 
     colButtonController = col_button->GetComponent<GlobalNamespace::ColorPickerButtonController*>();
     colButtonController->SetColor(parent->color);
     
     auto lockSprite = QuestUI::BeatSaberUI::FileToSprite(getDataDir(modInfo) + "lock.png");
+    auto lockSpriteActive = QuestUI::BeatSaberUI::FileToSprite(getDataDir(modInfo) + "lockActive.png");
     auto unlockSprite = QuestUI::BeatSaberUI::FileToSprite(getDataDir(modInfo) + "unlock.png");
-    lockButton = QuestUI::BeatSaberUI::CreateUIButton(get_transform(), "", [this, parent, lockSprite, unlockSprite](){
+    auto unlockSpriteActive = QuestUI::BeatSaberUI::FileToSprite(getDataDir(modInfo) + "unlockActive.png");
+    lockButton = QuestUI::BeatSaberUI::CreateUIButton(get_transform(), "", "SettingsButton", [this, parent, lockSprite, lockSpriteActive, unlockSprite, unlockSpriteActive](){
         parent->locked = !parent->locked;
-        if(parent->locked)
-            QuestUI::BeatSaberUI::SetButtonSprites(this->lockButton, lockSprite, lockSprite);
-        else
-            QuestUI::BeatSaberUI::SetButtonSprites(this->lockButton, unlockSprite, unlockSprite);
+        Cubes.SetCubeValue(parent->index, CubeInfo(parent));
+        QuestUI::BeatSaberUI::SetButtonSprites(lockButton, parent->locked ? lockSprite : unlockSprite, parent->locked ? lockSpriteActive : unlockSpriteActive);
     });
-    QuestUI::BeatSaberUI::SetButtonSprites(lockButton, unlockSprite, unlockSprite);
-    // closeButton->GetComponentInChildren<TMPro::TextMeshProUGUI*>()->set_margin({-16.5, 0, 0, 0});
-    rect = reinterpret_cast<UnityEngine::RectTransform*>(lockButton->get_transform());
-    rect->set_anchoredPosition({32, -5});
-    rect->set_sizeDelta({8, 8});
+    QuestUI::BeatSaberUI::SetButtonSprites(lockButton, parent->locked ? lockSprite : unlockSprite, parent->locked ? lockSpriteActive : unlockSpriteActive);
+    reinterpret_cast<UnityEngine::RectTransform*>(lockButton->get_transform())->set_anchoredPosition({32, -7});
+    reinterpret_cast<UnityEngine::RectTransform*>(lockButton->get_transform()->GetChild(0))->set_sizeDelta({5.5, 5.5});
 }
 #pragma endregion
