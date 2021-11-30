@@ -16,8 +16,11 @@
 #include "GlobalNamespace/GameplayCoreInstaller.hpp"
 #include "GlobalNamespace/EffectPoolsManualInstaller.hpp"
 
+#include "UnityEngine/Physics.hpp"
+#include "UnityEngine/Collider.hpp"
 #include "UnityEngine/Random.hpp"
 #include "UnityEngine/MaterialPropertyBlock.hpp"
+#include "GlobalNamespace/PauseAnimationController.hpp"
 #include "GlobalNamespace/ColorManager.hpp"
 #include "GlobalNamespace/ColorType.hpp"
 #include "GlobalNamespace/NoteDebrisPhysics.hpp"
@@ -28,18 +31,25 @@ using namespace GlobalNamespace;
 ModInfo modInfo;
 DEFINE_CONFIG(ModConfig);
 
-std::vector<Qubes::Cube*> cubes;
+std::vector<Cube*> cubeArr;
 NoteDebris* debrisPrefab;
 UnityEngine::Color lastColor;
 VRUIControls::VRPointer* pointer;
 HapticFeedbackController* haptics;
 PauseController* pauser;
-bool inMenu, inGameplay;
+bool inMenu, inGameplay, created = false;
 
-QubesConfig Cubes;
+std::vector<QubesConfig> QubesConfigs = {
+    QubesConfig("qubes"),
+    QubesConfig("qubes_default",
+        {CubeInfo({-3.7, 1, 1.2}, {0, -0.5, 0, 0.866}, {0.5, 0.5, 0.5, 1}, 2, 0, 1, false)})
+};
+
+// QubesConfigs.push_back(Cubes);
+// QubesConfigs.push_back(DefCubes);
 
 UnityEngine::GameObject* gameNote;
-Qubes::DefaultCube* defaultCube;
+DefaultCube* defaultCube;
 const std::vector<OVRInput::Button> buttons = {
     OVRInput::Button::PrimaryHandTrigger,
     OVRInput::Button::One,
@@ -71,35 +81,33 @@ void logHierarchy() {
     }
 }
 
-// make cubes and add to array if non default
+// make cubes
 // idk if there's a better way to do these macros
 #define threeVal(arr) {arr[0], arr[1], arr[2]}
 #define fourVal(arr) {arr[0], arr[1], arr[2], arr[3]}
-void makeCube(CubeInfo info) {
+Cube* makeCube(CubeInfo info, QubesConfig& cfg, int index) {
     auto pos = UnityEngine::Vector3 threeVal(info.pos);
     auto rot = UnityEngine::Quaternion fourVal(info.rot);
     auto color = UnityEngine::Color threeVal(info.color);
     auto ob = UnityEngine::Object::Instantiate(gameNote, pos, rot);
     UnityEngine::Object::DontDestroyOnLoad(ob);
-    auto cube = ob->AddComponent<Qubes::Cube*>();
-    // add one because of the default cube
+    auto cube = ob->AddComponent<Cube*>();
+    // needs to be set active before init
     ob->set_active(true);
-    cube->init(color, info.type, info.hitAction, info.size, info.locked, cubes.size() + 1);
-    cubes.push_back(cube);
+    cube->init(color, info.type, info.hitAction, info.size, info.locked, cfg, index);
+    return cube;
 }
-void makeDefaultCube(CubeInfo info) {
-    getLogger().info("making default cube");
+DefaultCube* makeDefaultCube(CubeInfo info, QubesConfig& cfg, int index) {
     auto pos = UnityEngine::Vector3 threeVal(info.pos);
     auto rot = UnityEngine::Quaternion fourVal(info.rot);
     auto color = UnityEngine::Color threeVal(info.color);
     auto ob = UnityEngine::Object::Instantiate(gameNote, pos, rot);
     UnityEngine::Object::DontDestroyOnLoad(ob);
-    auto cube = ob->AddComponent<Qubes::DefaultCube*>();
-    // if I just leave it inactive, the color/shader doesn't render (there's probably some refresh func but idk)
+    auto cube = ob->AddComponent<DefaultCube*>();
+    // needs to be set active before init
     ob->set_active(true);
-    cube->get_transform()->Translate({0, -2, 0});
-    cube->init(color, info.type, info.hitAction, info.size, info.locked, 0);
-    defaultCube = cube;
+    cube->init(color, info.type, info.hitAction, info.size, info.locked, cfg, index);
+    return cube;
 }
 #undef threeVal
 #undef fourVal
@@ -109,48 +117,47 @@ MAKE_HOOK_MATCH(SceneChanged, &UnityEngine::SceneManagement::SceneManager::Inter
     SceneChanged(prevScene, nextScene);
     // names = MainMenu, GameCore (QuestInit, EmptyTransition, HealthWarning, ShaderWarmup)
     if(nextScene && nextScene.IsValid() && to_utf8(csstrtostr(nextScene.get_name())) == "ShaderWarmup") {
-        // scene where the cube transform model is available
-        auto transform = UnityEngine::GameObject::Find(il2cpp_utils::createcsstr("NormalGameNote"))->get_transform()->Find(il2cpp_utils::createcsstr("NoteCube"));
-        // need to instantiate it into our own object so it stays available for creating cubes on demand
-        gameNote = UnityEngine::Object::Instantiate(transform)->get_gameObject();
-        UnityEngine::Object::DontDestroyOnLoad(gameNote);
-        gameNote->set_active(false);
+        // fix a few soft restart bugs
+        pointer = nullptr;
+        if(!created) {
+            getLogger().info("Creating cubes");
+            // scene where the cube transform model is available
+            auto transform = UnityEngine::GameObject::Find(il2cpp_utils::createcsstr("NormalGameNote"))->get_transform()->Find(il2cpp_utils::createcsstr("NoteCube"));
+            // need to instantiate it into our own object so it stays available for creating cubes on demand
+            gameNote = UnityEngine::Object::Instantiate(transform)->get_gameObject();
+            UnityEngine::Object::DontDestroyOnLoad(gameNote);
+            gameNote->set_active(false);
 
-        getLogger().info("Creating cubes");
-        bool first = true;
-        // cubes config loaded in the config init
-        for(auto info : Cubes.cubes) {
-            // first cube is the default cube, made later
-            if(first) {
-                makeDefaultCube(info);
-                first = false;
-            } else
-                makeCube(info);
+            // cubes config loaded in the config init
+            for(auto info : QubesConfigs[0].cubes)
+                cubeArr.push_back(makeCube(info, QubesConfigs[0], cubeArr.size()));
+
+            // only use the first cube in default cubes
+            defaultCube = makeDefaultCube(QubesConfigs[1].cubes[0], QubesConfigs[1], 0);
+
+            created = true;
         }
     }
     if(nextScene && to_utf8(csstrtostr(nextScene.get_name())) == "MainMenu") {
         inMenu = true;
-        // get pointer
-        if(!pointer)
-            pointer = UnityEngine::Resources::FindObjectsOfTypeAll<VRUIControls::VRPointer*>()->get(0);
+        // get pointer every time, since it changes in pause
+        pointer = UnityEngine::Resources::FindObjectsOfTypeAll<VRUIControls::VRPointer*>()->get(0);
         
         // activate or deactivate all cubes based on ShowInMenu
         auto active = getModConfig().ShowInMenu.GetValue();
-        for(auto cube : cubes)
-            cube->get_gameObject()->set_active(active);
+        for(auto cube : cubeArr)
+            cube->setActive(active);
         // disable default cube because we are not inside the settings
-        if(defaultCube)
-            defaultCube->get_gameObject()->set_active(false);
+        defaultCube->setActive(false);
     } else inMenu = false;
 
     if(nextScene && to_utf8(csstrtostr(nextScene.get_name())) == "GameCore") {
         inGameplay = true;
         // activate or deactivate all cubes based on ShowInLevel
         auto active = getModConfig().ShowInLevel.GetValue();
-        for(auto cube : cubes) {
-            cube->get_gameObject()->set_active(active);
-            if(cube->menu)
-                cube->menu->get_gameObject()->set_active(false);
+        for(auto cube : cubeArr) {
+            cube->setActive(active);
+            cube->setMenuActive(false);
         }
 
         pauser = UnityEngine::Resources::FindObjectsOfTypeAll<PauseController*>()->get(0);
@@ -165,6 +172,12 @@ MAKE_HOOK_MATCH(SceneChanged, &UnityEngine::SceneManagement::SceneManager::Inter
 #define toVector3(vector4) UnityEngine::Vector3(vector4.x, vector4.y, vector4.z)
 #define toVector4(vector3) UnityEngine::Vector4(vector3.x, vector3.y, vector3.z, 0)
 MAKE_HOOK_MATCH(DebrisInit, &NoteDebris::Init, void, NoteDebris* self, ColorType colorType, UnityEngine::Vector3 notePos, UnityEngine::Quaternion noteRot, UnityEngine::Vector3 noteMoveVec, UnityEngine::Vector3 noteScale, UnityEngine::Vector3 positionOffset, UnityEngine::Quaternion rotationOffset, UnityEngine::Vector3 cutPoint, UnityEngine::Vector3 cutNormal, UnityEngine::Vector3 force, UnityEngine::Vector3 torque, float lifeTime) {
+    // leave it normal if the debris is not from a cube
+    if(colorType != ColorType::_get_None()) {
+        DebrisInit(self, colorType, notePos, noteRot, noteMoveVec, noteScale, positionOffset, rotationOffset, cutPoint, cutNormal, force, torque, lifeTime); // I have no idea why this doesn't work
+        return;
+    }
+    // don't call what we're hooking to avoid custom debris
     UnityEngine::Quaternion quaternion = UnityEngine::Quaternion::Inverse(noteRot);
     UnityEngine::Vector3 vector = quaternion * (cutPoint - notePos);
     UnityEngine::Vector3 vector2 = quaternion * cutNormal;
@@ -202,11 +215,9 @@ MAKE_HOOK_MATCH(DebrisInit, &NoteDebris::Init, void, NoteDebris* self, ColorType
     self->materialPropertyBlockController->ApplyChanges();
     self->lifeTime = lifeTime;
     self->elapsedTime = 0;
-    // DebrisInit(self, colorType, notePos, noteRot, noteMoveVec, noteScale, positionOffset, rotationOffset, cutPoint, cutNormal, force, torque, lifeTime); I have no idea why this doesn't work
-    // everything up to here is copied and should be replacable with the line above, but that makes it crash for some reason
     // set custom color if the debris is not from a normal game note
     auto mat = self->materialPropertyBlockController->materialPropertyBlock;
-    if(mat && colorType == ColorType::_get_None())
+    if(mat)
         mat->SetColor(self->_get__colorID(), lastColor);
 }
 
@@ -214,7 +225,7 @@ MAKE_HOOK_MATCH(DebrisInit, &NoteDebris::Init, void, NoteDebris* self, ColorType
 MAKE_HOOK_MATCH(AnUpdate, &HMMainThreadDispatcher::Update, void, HMMainThreadDispatcher* self) {
     AnUpdate(self);
     // don't listen for buttons in gameplay
-    if(!pointer || !inMenu)
+    if(!pointer || (!inMenu))
         return;
     int i = 0; // keep track of index
     for(auto button : buttons) {
@@ -225,18 +236,24 @@ MAKE_HOOK_MATCH(AnUpdate, &HMMainThreadDispatcher::Update, void, HMMainThreadDis
             // check button with configured buttons and controller with configured controllers for all three
             if(i == getModConfig().BtnDel.GetValue() && (getModConfig().CtrlDel.GetValue() == 2 || getModConfig().CtrlDel.GetValue() == (isRight? 1 : 0))) {
                 getLogger().info("delete pressed");
+                // only delete one cube
                 bool deleted = false;
-                // iterate through cubes to find the one to be deleted
-                for(auto iter = cubes.begin(); iter != cubes.end(); ++iter) {
-                    if(!deleted && (*iter)->deletePressed()) {
-                        cubes.erase(iter);
-                        Cubes.RemoveCube((*iter)->index);
-                        deleted = true;
-                        // subtract one from the iterator to avoid skipping cubes
-                        --iter;
-                    } else if(deleted) {
-                        // decrement indices of all later cubes
-                        (*iter)->index--;
+                // physics raycast allows interaction through ui elements
+                UnityEngine::RaycastHit hit;
+                if(UnityEngine::Physics::Raycast(pointer->get_vrController()->get_position(), pointer->get_vrController()->get_forward(), hit, 100)) {
+                    // iterate through cubes to find the one to be deleted
+                    auto hitTransform = hit.get_collider()->get_transform();
+                    for(auto iter = cubeArr.begin(); iter != cubeArr.end(); ++iter) {
+                        if(!deleted && (*iter)->deletePressed(hitTransform)) {
+                            // destroyed and removed from config in deletePressed
+                            cubeArr.erase(iter);
+                            deleted = true;
+                            // subtract one from the iterator since we removed one from the array
+                            --iter;
+                        } else if(deleted) {
+                            // decrement indices of all later cubes
+                            (*iter)->index--;
+                        }
                     }
                 }
             }
@@ -247,20 +264,46 @@ MAKE_HOOK_MATCH(AnUpdate, &HMMainThreadDispatcher::Update, void, HMMainThreadDis
                 auto pos = ctrlr->get_position() + (ctrlr->get_forward().get_normalized() * (1.5 * getModConfig().CreateDist.GetValue()));
                 auto rot = getModConfig().CreateRot.GetValue() ? ctrlr->get_rotation() : UnityEngine::Quaternion::get_identity();
                 // create
-                auto info = CubeInfo(pos, rot, defaultCube->color, defaultCube->type, defaultCube->hitAction, defaultCube->size, defaultCube->locked);
-                makeCube(info);
-                Cubes.AddCube(info);
+                auto info = CubeInfo(pos, rot, defaultCube->getColor(), defaultCube->getType(), defaultCube->getHitAction(), defaultCube->getSize(), defaultCube->getLocked());
+                cubeArr.push_back(makeCube(info, QubesConfigs[0], cubeArr.size()));
+                QubesConfigs[0].AddCube(info);
             }
             if(i == getModConfig().BtnEdit.GetValue() && (getModConfig().CtrlEdit.GetValue() == 2 || getModConfig().CtrlEdit.GetValue() == (isRight? 1 : 0))) {
                 getLogger().info("edit pressed");
-                // cubes handle it internally
-                for(auto cube : cubes) {
-                    cube->editPressed();
+                // physics raycast allows interaction through ui elements
+                UnityEngine::RaycastHit hit;
+                if(UnityEngine::Physics::Raycast(pointer->get_vrController()->get_position(), pointer->get_vrController()->get_forward(), hit, 100)) {
+                    auto hitTransform = hit.get_collider()->get_transform();
+                    // cubes handle it internally
+                    for(auto cube : cubeArr) {
+                        cube->editPressed(hitTransform);
+                    }
                 }
             }
         }
         i++;
     }
+}
+
+MAKE_HOOK_MATCH(Pause, &PauseController::Pause, void, PauseController* self) {
+    Pause(self);
+    // get pointer every time, since it changes in menu (and also every pause or something)
+    auto arr = UnityEngine::Resources::FindObjectsOfTypeAll<VRUIControls::VRPointer*>();
+    if(arr->Length() < 2)
+        return;
+    pointer = arr->get(1);
+    inMenu = true;
+}
+
+MAKE_HOOK_MATCH(Resume, &PauseAnimationController::StartResumeFromPauseAnimation, void, PauseAnimationController* self) {
+    Resume(self);
+    // deactivate all menus and let all cubes only be cut after the saber registers having moved
+    for(auto cube : cubeArr) {
+        cube->setMenuActive(false);
+        cube->setCuttableDelay(false, 0);
+        cube->setCuttableDelay(true, 0.75);
+    }
+    inMenu = false;
 }
 
 extern "C" void setup(ModInfo& info) {
@@ -278,15 +321,15 @@ extern "C" void load() {
 
     getModConfig().Init(modInfo);
     QuestUI::Init();
-    // QuestUI::Register::RegisterModSettingsViewController(modInfo, DidActivate);
-    // QuestUI::Register::RegisterMainMenuModSettingsViewController(modInfo, DidActivate);
-    QuestUI::Register::RegisterModSettingsFlowCoordinator<Qubes::ModSettings*>(modInfo);
-    QuestUI::Register::RegisterMainMenuModSettingsFlowCoordinator<Qubes::ModSettings*>(modInfo);
+    QuestUI::Register::RegisterModSettingsFlowCoordinator<ModSettings*>(modInfo);
+    QuestUI::Register::RegisterMainMenuModSettingsFlowCoordinator<ModSettings*>(modInfo);
 
     getLogger().info("Installing hooks...");
     LoggerContextObject logger = getLogger().WithContext("load");
     INSTALL_HOOK(logger, SceneChanged);
     INSTALL_HOOK(logger, DebrisInit);
     INSTALL_HOOK(logger, AnUpdate);
+    INSTALL_HOOK(logger, Pause);
+    INSTALL_HOOK(logger, Resume);
     getLogger().info("Installed all hooks!");
 }

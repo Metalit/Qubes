@@ -1,16 +1,55 @@
 #pragma once
-#include "extern/config-utils/shared/config-utils.hpp"
 
-#include "extern/custom-types/shared/macros.hpp"
-#include "extern/custom-types/shared/register.hpp"
+#include "custom-types/shared/macros.hpp"
 
 #include "HMUI/ViewController.hpp"
 #include "HMUI/FlowCoordinator.hpp"
 
+#include "UnityEngine/GameObject.hpp"
 #include "UnityEngine/Color.hpp"
 
-namespace Qubes { class Cube; class DefaultCube; }
+#include "config-utils/shared/config-utils.hpp"
 
+namespace Qubes {
+    class DefaultCube;
+
+    struct CubeInfo {
+        float pos [3];
+        float rot [4];
+        float color [4];
+        int type;
+        int hitAction;
+        float size;
+        bool locked;
+
+        CubeInfo(UnityEngine::Vector3 pos, UnityEngine::Quaternion rot, UnityEngine::Color color, int type, int hitAction, float size, bool locked);
+        CubeInfo(rapidjson::Value& obj);
+        CubeInfo(DefaultCube* cube);
+
+        rapidjson::Value ToJSON(rapidjson::Document::AllocatorType& allocator);
+    };
+
+    struct QubesConfig {
+        Configuration* config;
+
+        std::vector<CubeInfo> cubes;
+        std::vector<CubeInfo> defCubes;
+        std::string name;
+
+        QubesConfig(std::string arrname, std::vector<CubeInfo> initCubes = {}) { name = arrname; defCubes = initCubes; }
+        void Init(Configuration* cfg);
+
+        void LoadValue();
+        void SetValue();
+        void SetCubeValue(int index, CubeInfo value);
+        void AddCube(CubeInfo cube);
+        void RemoveCube(int index);
+    };
+}
+
+using namespace Qubes;
+
+#pragma region configClasses
 DECLARE_CLASS_CODEGEN(Qubes, GlobalSettings, HMUI::ViewController,
     DECLARE_OVERRIDE_METHOD(void, DidActivate, il2cpp_utils::FindMethodUnsafe("HMUI", "ViewController", "DidActivate", 3), bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling);
 )
@@ -32,38 +71,11 @@ DECLARE_CLASS_CODEGEN(Qubes, ModSettings, HMUI::FlowCoordinator,
     Qubes::CreationSettings* creationSettings;
     Qubes::ButtonSettings* buttonSettings;
 )
+#pragma endregion
 
-struct CubeInfo {
-    float pos [3];
-    float rot [4];
-    float color [4];
-    int type;
-    int hitAction;
-    float size;
-    bool locked;
+extern std::vector<QubesConfig> QubesConfigs;
 
-    CubeInfo(UnityEngine::Vector3 pos, UnityEngine::Quaternion rot, UnityEngine::Color color, int type, int hitAction, float size, bool locked);
-    CubeInfo(rapidjson::Value& obj);
-    CubeInfo(Qubes::DefaultCube* cube);
-
-    rapidjson::Value ToJSON(rapidjson::Document::AllocatorType& allocator);
-};
-
-struct QubesConfig {
-    Configuration* config;
-
-    std::vector<CubeInfo> cubes;
-
-    void Init(Configuration* cfg);
-
-    void LoadValue();
-    void SetValue();
-    void SetCubeValue(int index, CubeInfo value);
-    void AddCube(CubeInfo cube);
-    void RemoveCube(int index);
-};
-
-extern QubesConfig Cubes;
+void migrate(Configuration* config);
 
 DECLARE_CONFIG(ModConfig,
 
@@ -87,7 +99,7 @@ DECLARE_CONFIG(ModConfig,
 
     CONFIG_VALUE(MoveSpeed, float, "Movement Speed", 1, "The speed that thumbstick controls move the qube");
     CONFIG_VALUE(RotSpeed, float, "Rotataion Speed", 1, "The speed that thumbstick controls rotate the qube");
-    CONFIG_VALUE(LeftThumbMove, bool, "Swap Thumbsticks", false, "Default: right thumbstick moves, left thumbstick rotates");
+    CONFIG_VALUE(LeftThumbMove, bool, "Swap Thumbsticks", false, "Default - right thumbstick moves, left thumbstick rotates");
     
     CONFIG_INIT_FUNCTION(
         CONFIG_INIT_VALUE(ShowInMenu);
@@ -107,6 +119,8 @@ DECLARE_CONFIG(ModConfig,
         CONFIG_INIT_VALUE(MoveSpeed);
         CONFIG_INIT_VALUE(RotSpeed);
         CONFIG_INIT_VALUE(LeftThumbMove);
-        Cubes.Init(config);
+        migrate(config);
+        for(QubesConfig& qube_cfg : QubesConfigs)
+            qube_cfg.Init(config);
     )
 )

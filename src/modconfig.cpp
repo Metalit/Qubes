@@ -20,8 +20,8 @@ const std::vector<std::string> controllerNames = { "Left", "Right", "Both" };
 #pragma region flowCoordinator
 void Qubes::ModSettings::DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling) {
     // set active in case show in menu is disabled
-    for(auto cube : cubes) {
-        cube->get_gameObject()->set_active(true);
+    for(auto cube : cubeArr) {
+        cube->setActive(true);
     }
 
     if(!firstActivation)
@@ -44,8 +44,8 @@ void Qubes::ModSettings::BackButtonWasPressed(HMUI::ViewController* topViewContr
     parentFlowCoordinator->DismissFlowCoordinator(this, HMUI::ViewController::AnimationDirection::Horizontal, nullptr, false);
     
     // set back to show in menu value
-    for(auto cube : cubes) {
-        cube->get_gameObject()->set_active(getModConfig().ShowInMenu.GetValue());
+    for(auto cube : cubeArr) {
+        cube->setActive(getModConfig().ShowInMenu.GetValue());
     }
 }
 #pragma endregion
@@ -69,31 +69,19 @@ void Qubes::GlobalSettings::DidActivate(bool firstActivation, bool addedToHierar
     AddConfigValueToggle(verticalTransform, getModConfig().ShowInLevel);
     AddConfigValueToggle(verticalTransform, getModConfig().ReqDirection);
     AddConfigValueToggle(verticalTransform, getModConfig().Debris);
-    AddConfigValueIncrementFloat(verticalTransform, getModConfig().RespawnTime, 1, 0.5, 1, 5);
+    AddConfigValueIncrementFloat(verticalTransform, getModConfig().RespawnTime, 1, 0.5, 0, 5);
     AddConfigValueIncrementFloat(verticalTransform, getModConfig().Vibration, 1, 0.1, 0, 2);
 }
 #pragma endregion
 
 #pragma region creationSettings
 void Qubes::CreationSettings::DidDeactivate(bool removedFromHierarchy, bool screenSystemDisabling) {
-    defaultCube->get_gameObject()->set_active(false);
+    defaultCube->setActive(false);
 }
 
 void Qubes::CreationSettings::DidActivate(bool firstActivation, bool addedToHierarchy, bool screenSystemEnabling) {
-    if(!defaultCube->menu) {
-        // create menu and stuff now because we can't in shader warmup
-        defaultCube->makeMenu();
-        defaultCube->menu->get_transform()->set_localRotation(UnityEngine::Quaternion::get_identity());
-        defaultCube->menu->closeButton->get_gameObject()->set_active(false);
-        defaultCube->menu->lockButton->get_gameObject()->set_active(false);
-        reinterpret_cast<UnityEngine::RectTransform*>(defaultCube->menu->colButtonController->button->get_transform())->set_anchoredPosition({32, 0});
-        defaultCube->menu->get_gameObject()->set_active(true);
-        // only set type now so that the dot shows
-        defaultCube->setType(defaultCube->type);
-        // bring the cube back up from underground
-        defaultCube->get_transform()->Translate({0, 2, 0});
-    }
-    defaultCube->get_gameObject()->set_active(true);
+    defaultCube->setActive(true);
+    defaultCube->setMenuActive(true);
 
     if(!firstActivation)
         return;
