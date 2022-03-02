@@ -42,7 +42,7 @@ const std::vector<std::string> cutEvents = { "None", "Pause", "Restart", "Menu",
 #define COROUTINE(coroutine) GlobalNamespace::SharedCoroutineStarter::get_instance()->START_CO(coroutine)
 
 #define GET_SPRITE(name) auto name##_arr = Array<uint8_t>::NewLength(name##_png::getLength()); \
-uint8_t* name##_arr_vals = (uint8_t*) name##_arr->values; name##_arr_vals = name##_png::getData(); \
+memcpy(name##_arr->values, name##_png::getData(), name##_png::getLength()); \
 auto name##_sprite = BeatSaberUI::ArrayToSprite(name##_arr);
 
 custom_types::Helpers::Coroutine crashCoroutine() {
