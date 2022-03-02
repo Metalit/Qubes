@@ -1,13 +1,8 @@
 #include "main.hpp"
 
-#include "beatsaber-hook/shared/utils/il2cpp-utils.hpp"
-#include "beatsaber-hook/shared/utils/utils.h"
-#include "beatsaber-hook/shared/utils/hooking.hpp"
-
 #include "questui/shared/QuestUI.hpp"
 
 #include "config-utils/shared/config-utils.hpp"
-#include "custom-types/shared/register.hpp"
 
 #include "UnityEngine/SceneManagement/SceneManager.hpp"
 
@@ -64,10 +59,10 @@ Logger& getLogger() {
 // currently unused but can be useful
 void logChildren(UnityEngine::Transform* t, std::string indent) {
     int num = t->get_childCount();
-    getLogger().info("%s%s has %i child%s", indent.c_str(), to_utf8(csstrtostr(t->get_gameObject()->get_name())).c_str(), num, num == 1? "" : "ren");
+    getLogger().info("%s%s has %i child%s", indent.c_str(), t->get_gameObject()->get_name().operator std::string().c_str(), num, num == 1? "" : "ren");
     auto arr = t->get_gameObject()->GetComponents<UnityEngine::MonoBehaviour*>();
-    for(int i = 0; i < arr->Length(); i++) {
-        getLogger().info("%s  Cmpnt: %s", indent.c_str(), to_utf8(csstrtostr(arr->get(i)->GetScriptClassName())).c_str());
+    for(int i = 0; i < arr.Length(); i++) {
+        getLogger().info("%s  Cmpnt: %s", indent.c_str(), arr[i]->GetScriptClassName().operator std::string().c_str());
     }
     for(int i = 0; i < num; i++) {
         logChildren(t->GetChild(i), indent + "  ");
@@ -75,54 +70,45 @@ void logChildren(UnityEngine::Transform* t, std::string indent) {
 }
 void logHierarchy() {
     auto objects = UnityEngine::SceneManagement::SceneManager::GetActiveScene().GetRootGameObjects();
-    for(int i = 0; i < objects->Length(); i++) {
-        getLogger().info("Root object: %s", to_utf8(csstrtostr(objects->get(i)->get_name())).c_str());
-        logChildren(objects->get(i)->get_transform(), "  ");
+    for(int i = 0; i < objects.Length(); i++) {
+        getLogger().info("Root object: %s", objects[i]->get_name().operator std::string().c_str());
+        logChildren(objects[i]->get_transform(), "  ");
     }
 }
 
 // make cubes
-// idk if there's a better way to do these macros
-#define threeVal(arr) {arr[0], arr[1], arr[2]}
-#define fourVal(arr) {arr[0], arr[1], arr[2], arr[3]}
 Cube* makeCube(CubeInfo info, QubesConfig& cfg, int index) {
-    auto pos = UnityEngine::Vector3 threeVal(info.pos);
-    auto rot = UnityEngine::Quaternion fourVal(info.rot);
-    auto color = UnityEngine::Color threeVal(info.color);
-    auto ob = UnityEngine::Object::Instantiate(gameNote, pos, rot);
+    auto ob = UnityEngine::Object::Instantiate(gameNote, info.pos, info.rot);
     UnityEngine::Object::DontDestroyOnLoad(ob);
     auto cube = ob->AddComponent<Cube*>();
     // needs to be set active before init
     ob->set_active(true);
-    cube->init(color, info.type, info.hitAction, info.size, info.locked, cfg, index);
+    cube->init(info.color, info.type, info.hitAction, info.size, info.locked, cfg, index);
     return cube;
 }
 DefaultCube* makeDefaultCube(CubeInfo info, QubesConfig& cfg, int index) {
-    auto pos = UnityEngine::Vector3 threeVal(info.pos);
-    auto rot = UnityEngine::Quaternion fourVal(info.rot);
-    auto color = UnityEngine::Color threeVal(info.color);
-    auto ob = UnityEngine::Object::Instantiate(gameNote, pos, rot);
+    auto ob = UnityEngine::Object::Instantiate(gameNote, info.pos, info.rot);
     UnityEngine::Object::DontDestroyOnLoad(ob);
     auto cube = ob->AddComponent<DefaultCube*>();
     // needs to be set active before init
     ob->set_active(true);
-    cube->init(color, info.type, info.hitAction, info.size, info.locked, cfg, index);
+    cube->init(info.color, info.type, info.hitAction, info.size, info.locked, cfg, index);
     return cube;
 }
-#undef threeVal
-#undef fourVal
 
 // Hooks
 MAKE_HOOK_MATCH(SceneChanged, &UnityEngine::SceneManagement::SceneManager::Internal_ActiveSceneChanged, void, UnityEngine::SceneManagement::Scene prevScene, UnityEngine::SceneManagement::Scene nextScene) {
     SceneChanged(prevScene, nextScene);
     // names = MainMenu, GameCore (QuestInit, EmptyTransition, HealthWarning, ShaderWarmup)
-    if(nextScene && nextScene.IsValid() && to_utf8(csstrtostr(nextScene.get_name())) == "ShaderWarmup") {
+    if(nextScene && nextScene.IsValid() && nextScene.get_name() == "ShaderWarmup") {
         // fix a few soft restart bugs
         pointer = nullptr;
         if(!created) {
             getLogger().info("Creating cubes");
+            static ConstString normalNoteName("NormalGameNote");
+            static ConstString cubeName("NoteCube");
             // scene where the cube transform model is available
-            auto transform = UnityEngine::GameObject::Find(il2cpp_utils::createcsstr("NormalGameNote"))->get_transform()->Find(il2cpp_utils::createcsstr("NoteCube"));
+            auto transform = UnityEngine::GameObject::Find(normalNoteName)->get_transform()->Find(cubeName);
             // need to instantiate it into our own object so it stays available for creating cubes on demand
             gameNote = UnityEngine::Object::Instantiate(transform)->get_gameObject();
             UnityEngine::Object::DontDestroyOnLoad(gameNote);
@@ -138,10 +124,10 @@ MAKE_HOOK_MATCH(SceneChanged, &UnityEngine::SceneManagement::SceneManager::Inter
             created = true;
         }
     }
-    if(nextScene && to_utf8(csstrtostr(nextScene.get_name())) == "MainMenu") {
+    if(nextScene && nextScene.get_name() == "MainMenu") {
         inMenu = true;
         // get pointer every time, since it changes in pause
-        pointer = UnityEngine::Resources::FindObjectsOfTypeAll<VRUIControls::VRPointer*>()->get(0);
+        pointer = UnityEngine::Resources::FindObjectsOfTypeAll<VRUIControls::VRPointer*>()[0];
         
         // activate or deactivate all cubes based on ShowInMenu
         auto active = getModConfig().ShowInMenu.GetValue();
@@ -151,7 +137,7 @@ MAKE_HOOK_MATCH(SceneChanged, &UnityEngine::SceneManagement::SceneManager::Inter
         defaultCube->setActive(false);
     } else inMenu = false;
 
-    if(nextScene && to_utf8(csstrtostr(nextScene.get_name())) == "GameCore") {
+    if(nextScene && nextScene.get_name() == "GameCore") {
         inGameplay = true;
         // activate or deactivate all cubes based on ShowInLevel
         auto active = getModConfig().ShowInLevel.GetValue();
@@ -160,12 +146,12 @@ MAKE_HOOK_MATCH(SceneChanged, &UnityEngine::SceneManagement::SceneManager::Inter
             cube->setMenuActive(false);
         }
 
-        pauser = UnityEngine::Resources::FindObjectsOfTypeAll<PauseController*>()->get(0);
+        pauser = UnityEngine::Resources::FindObjectsOfTypeAll<PauseController*>()[0];
         // only need to get the addresses once
         if(!haptics)
-            haptics = UnityEngine::Resources::FindObjectsOfTypeAll<HapticFeedbackController*>()->get(0);
+            haptics = UnityEngine::Resources::FindObjectsOfTypeAll<HapticFeedbackController*>()[0];
         if(!debrisPrefab)
-            debrisPrefab = UnityEngine::Resources::FindObjectsOfTypeAll<EffectPoolsManualInstaller*>()->get(0)->noteDebrisHDPrefab;
+            debrisPrefab = UnityEngine::Resources::FindObjectsOfTypeAll<EffectPoolsManualInstaller*>()[0]->noteDebrisHDPrefab;
     } else inGameplay = false;
 }
 
@@ -188,9 +174,9 @@ MAKE_HOOK_MATCH(DebrisInit, &NoteDebris::Init, void, NoteDebris* self, ColorType
     vector3.w = 0 - UnityEngine::Vector3::Dot(vector2, vector);
     float num = sqrt(UnityEngine::Vector4::Dot(vector3, vector3));
     UnityEngine::Vector3 zero = UnityEngine::Vector3::get_zero();
-    int num2 = self->_get__meshVertices()->Length();
+    int num2 = self->_get__meshVertices().Length();
     for (int i = 0; i < num2; i++) {
-        UnityEngine::Vector3 vector4 = self->_get__meshVertices()->get(i);
+        UnityEngine::Vector3 vector4 = self->_get__meshVertices()[i];
         float num3 = UnityEngine::Vector3::Dot(toVector3(vector3), vector4) + vector3.w;
         if (num3 < 0) {
             float num4 = num3 / num;
@@ -289,9 +275,9 @@ MAKE_HOOK_MATCH(Pause, &PauseController::Pause, void, PauseController* self) {
     Pause(self);
     // get pointer every time, since it changes in menu (and also every pause or something)
     auto arr = UnityEngine::Resources::FindObjectsOfTypeAll<VRUIControls::VRPointer*>();
-    if(arr->Length() < 2)
+    if(arr.Length() < 2)
         return;
-    pointer = arr->get(1);
+    pointer = arr[1];
     inMenu = true;
 }
 

@@ -3,15 +3,13 @@
 #pragma region macros
 #define SetArr(name) auto name##_arr = obj[#name].GetArray(); \
 for(int i = 0; i < name##_arr.Size(); i++) { \
-    name[i] = name##_arr[i].GetFloat(); \
+    name.set_Item(i, name##_arr[i].GetFloat()); \
 }
-#define JSONArr(name) rapidjson::Value name##_arr(rapidjson::kArrayType); \
-for(auto i : name) { \
-    name##_arr.PushBack(i, allocator); \
+#define JSONArr(name, num) rapidjson::Value name##_arr(rapidjson::kArrayType); \
+for(int i = 0; i < num; i++) { \
+    name##_arr.PushBack(name.get_Item(i), allocator); \
 } \
 v.AddMember(#name, name##_arr, allocator)
-#define valArr3(name, value, v0, v1, v2) auto name##_v = value; name[0] = name##_v.v0; name[1] = name##_v.v1; name[2] = name##_v.v2
-#define valArr4(name, value, v0, v1, v2, v3) auto name##_v = value; name[0] = name##_v.v0; name[1] = name##_v.v1; name[2] = name##_v.v2, name[3] = name##_v.v3
 #pragma endregion
 
 // you do one tiny little bit of jank in your config, and you end up with migration code in your mod forever
@@ -41,9 +39,9 @@ void migrate(Configuration* config) {
 }
 
 CubeInfo::CubeInfo(UnityEngine::Vector3 in_pos, UnityEngine::Quaternion in_rot, UnityEngine::Color in_color, int in_type, int in_hitAction, float in_size, bool in_locked) {
-    valArr3(pos, in_pos, x, y, z);
-    valArr4(rot, in_rot, x, y, z, w);
-    valArr4(color, in_color, r, g, b, a);
+    pos = in_pos;
+    rot = in_rot;
+    color = in_color;
     type = in_type;
     hitAction = in_hitAction;
     size = in_size;
@@ -63,9 +61,9 @@ CubeInfo::CubeInfo(rapidjson::Value& obj) {
 
 CubeInfo::CubeInfo(Qubes::DefaultCube* cube) {
     // get values from cube
-    valArr3(pos, cube->get_transform()->get_position(), x, y, z);
-    valArr4(rot, cube->get_transform()->get_rotation(), x, y, z, w);
-    valArr4(color, cube->getColor(), r, g, b, a);
+    pos = cube->get_transform()->get_position();
+    rot = cube->get_transform()->get_rotation();
+    color = cube->getColor();
     type = cube->getType();
     hitAction = cube->getHitAction();
     size = cube->getSize();
@@ -75,9 +73,9 @@ CubeInfo::CubeInfo(Qubes::DefaultCube* cube) {
 rapidjson::Value CubeInfo::ToJSON(rapidjson::Document::AllocatorType& allocator) {
     // returns a json object with its info
     rapidjson::Value v(rapidjson::kObjectType);
-    JSONArr(pos);
-    JSONArr(rot);
-    JSONArr(color);
+    JSONArr(pos, 3);
+    JSONArr(rot, 4);
+    JSONArr(color, 4);
     v.AddMember("type", type, allocator);
     v.AddMember("hitAction", hitAction, allocator);
     v.AddMember("size", size, allocator);

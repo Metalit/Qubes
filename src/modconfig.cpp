@@ -35,7 +35,8 @@ void Qubes::ModSettings::DidActivate(bool firstActivation, bool addedToHierarchy
         buttonSettings = BeatSaberUI::CreateViewController<Qubes::ButtonSettings*>();
     
     showBackButton = true;
-    SetTitle(il2cpp_utils::createcsstr("Qube Settings"), HMUI::ViewController::AnimationType::In);
+    static ConstString title("Qube Settings");
+    SetTitle(title, HMUI::ViewController::AnimationType::In);
 
     ProvideInitialViewControllers(globalSettings, creationSettings, buttonSettings, nullptr, nullptr);
 }
@@ -106,34 +107,34 @@ void Qubes::CreationSettings::DidActivate(bool firstActivation, bool addedToHier
 #pragma region buttonSettings
 // makes the paired dropdown menus for controller bindings
 void makeDropdowns(UnityEngine::Transform* parent, ConfigUtils::ConfigValue<int>& buttonSetting, ConfigUtils::ConfigValue<int>& controllerSetting) {
+    std::vector<StringW> buttonNamesList(buttonNames.begin(), buttonNames.end());
     auto layout = BeatSaberUI::CreateHorizontalLayoutGroup(parent)->get_transform();
-    auto d = BeatSaberUI::CreateDropdown(layout, buttonSetting.GetName(), buttonNames[buttonSetting.GetValue()], buttonNames, [&buttonSetting](std::string_view value){
-        int i = 0;
-        for(auto bstr : buttonNames) {
-            if(bstr == value.data()) {
+    auto d = BeatSaberUI::CreateDropdown(layout, buttonSetting.GetName(), buttonNamesList[buttonSetting.GetValue()], buttonNamesList, [&buttonSetting](StringW value){
+        for(int i = 0; i < buttonNames.size(); i++) {
+            if(value == buttonNames[i]) {
                 buttonSetting.SetValue(i);
                 break;
             }
-            i++;
         }
     });
-    reinterpret_cast<UnityEngine::RectTransform*>(d->get_transform())->SetSizeWithCurrentAnchors(UnityEngine::RectTransform::Axis::Horizontal, 27);
+    ((UnityEngine::RectTransform*) d->get_transform())->SetSizeWithCurrentAnchors(UnityEngine::RectTransform::Axis::Horizontal, 27);
     auto p = d->get_transform()->get_parent();
-    reinterpret_cast<UnityEngine::RectTransform*>(p->Find(il2cpp_utils::createcsstr("Label")))->set_anchorMax({2, 1});
+    static ConstString labelName("Label");
+    ((UnityEngine::RectTransform*) p->Find(labelName))->set_anchorMax({2, 1});
     p->get_gameObject()->GetComponent<UnityEngine::UI::LayoutElement*>()->set_preferredWidth(48);
-    d = BeatSaberUI::CreateDropdown(layout, controllerSetting.GetName(), controllerNames[controllerSetting.GetValue()], controllerNames, [&controllerSetting](std::string_view value){
-        int i = 0;
-        for(auto cstr : controllerNames) {
-            if(cstr == value.data()) {
+
+    std::vector<StringW> controllerNamesList(controllerNames.begin(), controllerNames.end());
+    d = BeatSaberUI::CreateDropdown(layout, controllerSetting.GetName(), controllerNamesList[controllerSetting.GetValue()], controllerNamesList, [&controllerSetting](StringW value){
+        for(int i = 0; i < controllerNames.size(); i++) {
+            if(controllerNames[i] == value) {
                 controllerSetting.SetValue(i);
                 break;
             }
-            i++;
         }
     });
-    reinterpret_cast<UnityEngine::RectTransform*>(d->get_transform())->SetSizeWithCurrentAnchors(UnityEngine::RectTransform::Axis::Horizontal, 22);
+    ((UnityEngine::RectTransform*) d->get_transform())->SetSizeWithCurrentAnchors(UnityEngine::RectTransform::Axis::Horizontal, 22);
     p = d->get_transform()->get_parent();
-    reinterpret_cast<UnityEngine::RectTransform*>(p->Find(il2cpp_utils::createcsstr("Label")))->set_anchorMax({2, 1});
+    ((UnityEngine::RectTransform*) p->Find(labelName))->set_anchorMax({2, 1});
     p->get_gameObject()->GetComponent<UnityEngine::UI::LayoutElement*>()->set_preferredWidth(42);
 }
 

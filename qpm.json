@@ -4,14 +4,16 @@
   "info": {
     "name": "Qubes",
     "id": "qubes",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "url": null,
-    "additionalData": {}
+    "additionalData": {
+      "overrideSoName": "libqubes.so"
+    }
   },
   "dependencies": [
     {
       "id": "beatsaber-hook",
-      "versionRange": "^2.0.0",
+      "versionRange": "^3.6.7",
       "additionalData": {
         "extraFiles": [
           "src/inline-hook"
@@ -20,27 +22,27 @@
     },
     {
       "id": "codegen",
-      "versionRange": "^0.14.0",
+      "versionRange": "^0.19.0",
       "additionalData": {}
     },
     {
       "id": "questui",
-      "versionRange": "^0.11.0",
+      "versionRange": "^0.13.0",
       "additionalData": {}
     },
     {
       "id": "custom-types",
-      "versionRange": "^0.12.0",
+      "versionRange": "^0.15.0",
       "additionalData": {}
     },
     {
       "id": "config-utils",
-      "versionRange": "^0.6.0",
+      "versionRange": "*",
       "additionalData": {}
     },
     {
       "id": "conditional-dependencies",
-      "versionRange": "^0.2.0",
+      "versionRange": "*",
       "additionalData": {}
     }
   ],

@@ -1,42 +1,36 @@
 {
   "_QPVersion": "0.1.1",
-  "id": "qubes",
   "name": "Qubes",
-  "version": "1.1.0",
+  "id": "qubes",
   "author": "Metalit",
+  "version": "1.2.0",
   "packageId": "com.beatgames.beatsaber",
-  "packageVersion": "1.17.1",
+  "packageVersion": "1.19.0",
+  "description": "Highly customizable Qubes(tm) that you can play with.",
+  "coverImage": "cover.png",
+  "dependencies": [
+    {
+      "version": "^0.15.0",
+      "id": "custom-types",
+      "downloadIfMissing": "https://github.com/sc2ad/Il2CppQuestTypePatching/releases/download/v0.15.7/CustomTypes.qmod"
+    },
+    {
+      "version": "^0.19.0",
+      "id": "codegen",
+      "downloadIfMissing": "https://github.com/sc2ad/BeatSaber-Quest-Codegen/releases/download/v0.19.3/Codegen.qmod"
+    },
+    {
+      "version": "^0.13.0",
+      "id": "questui",
+      "downloadIfMissing": "https://github.com/darknight1050/questui/releases/download/v0.13.1/QuestUI.qmod"
+    }
+  ],
   "modFiles": [
     "libqubes.so"
   ],
   "libraryFiles": [
-    "libbeatsaber-hook_2_3_2.so"
+    "libbeatsaber-hook_3_6_8.so"
   ],
-  "dependencies": [],
-  "fileCopies": [
-    {
-      "name": "close.png",
-      "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/qubes/close.png"
-    },
-    {
-      "name": "lock.png",
-      "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/qubes/lock.png"
-    },
-    {
-      "name": "unlock.png",
-      "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/qubes/unlock.png"
-    },
-    {
-      "name": "closeActive.png",
-      "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/qubes/closeActive.png"
-    },
-    {
-      "name": "lockActive.png",
-      "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/qubes/lockActive.png"
-    },
-    {
-      "name": "unlockActive.png",
-      "destination": "/sdcard/ModData/com.beatgames.beatsaber/Mods/qubes/unlockActive.png"
-    }
-  ]
+  "fileCopies": [],
+  "copyExtensions": []
 }

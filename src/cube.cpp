@@ -1,4 +1,5 @@
 #include "main.hpp"
+#include "assets.hpp"
 
 #include "GlobalNamespace/ILevelRestartController.hpp"
 #include "GlobalNamespace/IReturnToMenuController.hpp"
@@ -27,6 +28,7 @@ DEFINE_TYPE(Qubes, Cube);
 DEFINE_TYPE(Qubes, EditMenu);
 
 using namespace Qubes;
+using namespace QuestUI;
 
 #include "UnityEngine/Canvas.hpp"
 #include "UnityEngine/AdditionalCanvasShaderChannels.hpp"
@@ -36,19 +38,21 @@ using namespace Qubes;
 const std::vector<std::string> cubeTypes = { "Blank", "Dot", "Arrow" };
 const std::vector<std::string> cutEvents = { "None", "Pause", "Restart", "Menu", "Crash" };
 
-#define START_CO(coroutine) StartCoroutine(reinterpret_cast<System::Collections::IEnumerator*>(custom_types::Helpers::CoroutineHelper::New(coroutine)))
+#define START_CO(coroutine) StartCoroutine(custom_types::Helpers::CoroutineHelper::New(coroutine))
 #define COROUTINE(coroutine) GlobalNamespace::SharedCoroutineStarter::get_instance()->START_CO(coroutine)
 
-#define MOD_INFO_SPRITE(name) QuestUI::BeatSaberUI::FileToSprite(getDataDir(modInfo) + #name".png")
+#define GET_SPRITE(name) auto name##_arr = Array<uint8_t>::NewLength(name##_png::getLength()); \
+uint8_t* name##_arr_vals = (uint8_t*) name##_arr->values; name##_arr_vals = name##_png::getData(); \
+auto name##_sprite = BeatSaberUI::ArrayToSprite(name##_arr);
 
 custom_types::Helpers::Coroutine crashCoroutine() {
-    co_yield reinterpret_cast<System::Collections::IEnumerator*>(UnityEngine::WaitForSeconds::New_ctor(0.5));
-    getLogger().info("Crashing. You did this.");
-    CRASH_UNLESS(false);
+    co_yield (System::Collections::IEnumerator*) UnityEngine::WaitForSeconds::New_ctor(0.5);
+    getLogger().info("Crashing");
+    SAFE_ABORT();
     co_return;
 }
 custom_types::Helpers::Coroutine deleteCoroutine(GlobalNamespace::NoteDebris* debris) {
-    co_yield reinterpret_cast<System::Collections::IEnumerator*>(UnityEngine::WaitForSeconds::New_ctor(1.5));
+    co_yield (System::Collections::IEnumerator*) UnityEngine::WaitForSeconds::New_ctor(1.5);
     getLogger().info("Deleting debris");
     auto ob = debris->get_gameObject();
     if(ob)
@@ -84,7 +88,7 @@ void spawnDebris(UnityEngine::Vector3 cutPoint, UnityEngine::Vector3 cutNormal, 
 #pragma region defaultCube
 UnityEngine::Transform* DefaultCube::findTransform(std::string_view name) {
     // finds children transforms by name
-    return get_transform()->Find(il2cpp_utils::createcsstr(name));
+    return get_transform()->Find(name);
 }
 
 void DefaultCube::init(UnityEngine::Color color, int cubeType, int onHit, float cubeSize, bool lock, QubesConfig& cfg, int cfg_index) {
@@ -108,8 +112,8 @@ void DefaultCube::init(UnityEngine::Color color, int cubeType, int onHit, float 
     setSize(cubeSize);
 
     auto renderers = GetComponentsInChildren<UnityEngine::Renderer*>();
-    for(int i = 0; i < renderers->Length(); i++) {
-        renderers->get(i)->set_enabled(true);
+    for(int i = 0; i < renderers.Length(); i++) {
+        renderers[i]->set_enabled(true);
     }
     findTransform("SmallCuttable")->GetComponent<GlobalNamespace::BoxCuttableBySaber*>()->set_colliderSize({0.5, 0.5, 0.5});
 
@@ -118,7 +122,7 @@ void DefaultCube::init(UnityEngine::Color color, int cubeType, int onHit, float 
 
 void DefaultCube::makeMenu() {
     getLogger().info("Creating menu");
-    auto go = QuestUI::BeatSaberUI::CreateCanvas();
+    auto go = BeatSaberUI::CreateCanvas();
     UnityEngine::Object::DontDestroyOnLoad(go);
     // makes it render on the same layer as the pause menu
     go->GetComponent<UnityEngine::Canvas*>()->set_sortingOrder(31);
@@ -175,7 +179,7 @@ void DefaultCube::setSize(float newSize) {
 
 #pragma region cube
 custom_types::Helpers::Coroutine Cube::respawnCoroutine() {
-    co_yield reinterpret_cast<System::Collections::IEnumerator*>(UnityEngine::WaitForSeconds::New_ctor(getModConfig().RespawnTime.GetValue()));
+    co_yield (System::Collections::IEnumerator*) UnityEngine::WaitForSeconds::New_ctor(getModConfig().RespawnTime.GetValue());
     auto ob = get_gameObject();
     // don't respawn if in menu and show in menu is disabled
     if(ob && !(inMenu && !getModConfig().ShowInMenu.GetValue()))
@@ -184,7 +188,7 @@ custom_types::Helpers::Coroutine Cube::respawnCoroutine() {
 }
 
 custom_types::Helpers::Coroutine Cube::cuttableCoroutine(bool cuttable, float seconds) {
-    co_yield reinterpret_cast<System::Collections::IEnumerator*>(UnityEngine::WaitForSeconds::New_ctor(seconds));
+    co_yield (System::Collections::IEnumerator*) UnityEngine::WaitForSeconds::New_ctor(seconds);
     if(hitbox)
         hitbox->set_canBeCut(cuttable);
     co_return;
@@ -328,7 +332,7 @@ void Cube::handleCut(GlobalNamespace::Saber* saber, UnityEngine::Vector3 cutPoin
                 pauser->beatmapObjectManager->PauseAllBeatmapObjects(true);
                 if(pauser->didPauseEvent)
                     pauser->didPauseEvent->Invoke();
-                pointer = UnityEngine::Resources::FindObjectsOfTypeAll<VRUIControls::VRPointer*>()->get(1);
+                pointer = UnityEngine::Resources::FindObjectsOfTypeAll<VRUIControls::VRPointer*>()[1];
                 inMenu = true;
             }
             break;
@@ -404,17 +408,17 @@ void EditMenu::LateUpdate() {
     t->set_position(offsetVec + pos);
 }
 
-void setButtons(QuestUI::IncrementSetting* inc) {
+void setButtons(IncrementSetting* inc) {
     auto arr = inc->get_gameObject()->get_transform()->GetChild(1)->GetComponentsInChildren<UnityEngine::UI::Button*>();
-    auto decButton = arr->get(0);
-    auto incButton = arr->get(1);
+    auto decButton = arr[0];
+    auto incButton = arr[1];
     decButton->set_interactable(inc->CurrentValue != inc->MinValue);
     incButton->set_interactable(inc->CurrentValue != inc->MaxValue);
 }
 void EditMenu::init(DefaultCube* parent) {
     getLogger().info("menu init");
-    auto background = get_gameObject()->AddComponent<QuestUI::Backgroundable*>();
-    background->ApplyBackgroundWithAlpha(il2cpp_utils::createcsstr("round-rect-panel"), 0.5);
+    auto background = get_gameObject()->AddComponent<Backgroundable*>();
+    background->ApplyBackgroundWithAlpha("round-rect-panel", 0.5);
     background->background->set_raycastTarget(true);
     GetComponent<UnityEngine::Canvas*>()->set_sortingOrder(31);
 
@@ -424,97 +428,113 @@ void EditMenu::init(DefaultCube* parent) {
     float inv_size = 0.03/parent->getSize();
     get_transform()->set_localScale({inv_size, inv_size, inv_size});
     // doesn't resize to contents on its own
-    reinterpret_cast<UnityEngine::RectTransform*>(get_transform())->set_sizeDelta({75, 25});
+    ((UnityEngine::RectTransform*) get_transform())->set_sizeDelta({75, 25});
     get_gameObject()->set_active(false);
 
     // value settings
-    valVertical = QuestUI::BeatSaberUI::CreateVerticalLayoutGroup(get_transform());
+    valVertical = BeatSaberUI::CreateVerticalLayoutGroup(get_transform());
     valVertical->get_rectTransform()->set_anchoredPosition({-4, -2});
     valVertical->set_childControlWidth(true);
     valVertical->set_childControlHeight(true);
     valVertical->set_childForceExpandHeight(false);
 
     // lines at the end set the widths to 60
-    typeInc = QuestUI::BeatSaberUI::CreateIncrementSetting(valVertical->get_transform(), "Cube Type", 0, 1, parent->getType(), 0, 2, [parent, this](int value){
+    typeInc = BeatSaberUI::CreateIncrementSetting(valVertical->get_transform(), "Cube Type", 0, 1, parent->getType(), 0, 2, [parent, this](int value){
         parent->setType(value);
         parent->save();
-        this->typeInc->Text->SetText(il2cpp_utils::createcsstr(cubeTypes[value]));
+        this->typeInc->Text->SetText(cubeTypes[value]);
         setButtons(this->typeInc);
     });
     setButtons(typeInc);
     typeInc->get_transform()->get_parent()->get_gameObject()->GetComponent<UnityEngine::UI::LayoutElement*>()->set_preferredWidth(60);
-    typeInc->Text->SetText(il2cpp_utils::createcsstr(cubeTypes[parent->getType()]));
+    typeInc->Text->SetText(cubeTypes[parent->getType()]);
 
-    eventInc = QuestUI::BeatSaberUI::CreateIncrementSetting(valVertical->get_transform(), "Hit Action", 0, 1, parent->getHitAction(), 0, 4, [parent, this](int value){
+    eventInc = BeatSaberUI::CreateIncrementSetting(valVertical->get_transform(), "Hit Action", 0, 1, parent->getHitAction(), 0, 4, [parent, this](int value){
         parent->setHitAction(value);
         parent->save();
-        this->eventInc->Text->SetText(il2cpp_utils::createcsstr(cutEvents[value]));
+        this->eventInc->Text->SetText(cutEvents[value]);
         setButtons(this->eventInc);
     });
     setButtons(eventInc);
     eventInc->get_transform()->get_parent()->get_gameObject()->GetComponent<UnityEngine::UI::LayoutElement*>()->set_preferredWidth(60);
-    eventInc->Text->SetText(il2cpp_utils::createcsstr(cutEvents[parent->getHitAction()]));
+    eventInc->Text->SetText(cutEvents[parent->getHitAction()]);
 
-    QuestUI::BeatSaberUI::CreateSliderSetting(valVertical->get_transform(), "Qube Size", 0.01, parent->getSize(), 0.25, 1.5, 0, [parent](float value){
+    BeatSaberUI::CreateSliderSetting(valVertical->get_transform(), "Qube Size", 0.01, parent->getSize(), 0.25, 1.5, 0, [parent](float value){
         parent->setSize(value);
     })->get_transform()->get_parent()->get_gameObject()->GetComponent<UnityEngine::UI::LayoutElement*>()->set_preferredWidth(60);
 
     // color settings
-    colVertical = QuestUI::BeatSaberUI::CreateVerticalLayoutGroup(get_transform());
+    colVertical = BeatSaberUI::CreateVerticalLayoutGroup(get_transform());
     colVertical->get_rectTransform()->set_anchoredPosition({-4, -2});
     colVertical->set_childControlWidth(true);
     colVertical->set_childControlHeight(true);
     colVertical->set_childForceExpandHeight(false);
     
-    auto colslider = QuestUI::BeatSaberUI::CreateSliderSetting(colVertical->get_transform(), "R", 1, parent->getColor().r * 255, 0, 255, 0, [parent](float value){
+    auto colslider = BeatSaberUI::CreateSliderSetting(colVertical->get_transform(), "R", 1, parent->getColor().r * 255, 0, 255, 0, [parent](float value){
         parent->setColor({value/255, parent->getColor().g, parent->getColor().b, 1});
         parent->save();
     });
     colslider->get_transform()->get_parent()->get_gameObject()->GetComponent<UnityEngine::UI::LayoutElement*>()->set_preferredWidth(60);
-    reinterpret_cast<UnityEngine::RectTransform*>(colslider->slider->get_transform())->set_sizeDelta({56, 0});
+    ((UnityEngine::RectTransform*) colslider->slider->get_transform())->set_sizeDelta({56, 0});
 
-    colslider = QuestUI::BeatSaberUI::CreateSliderSetting(colVertical->get_transform(), "G", 1, parent->getColor().g * 255, 0, 255, 0, [parent](float value){
+    colslider = BeatSaberUI::CreateSliderSetting(colVertical->get_transform(), "G", 1, parent->getColor().g * 255, 0, 255, 0, [parent](float value){
         parent->setColor({parent->getColor().r, value/255, parent->getColor().b, 1});
         parent->save();
     });
     colslider->get_transform()->get_parent()->get_gameObject()->GetComponent<UnityEngine::UI::LayoutElement*>()->set_preferredWidth(60);
-    reinterpret_cast<UnityEngine::RectTransform*>(colslider->slider->get_transform())->set_sizeDelta({56, 0});
+    ((UnityEngine::RectTransform*) colslider->slider->get_transform())->set_sizeDelta({56, 0});
 
-    colslider = QuestUI::BeatSaberUI::CreateSliderSetting(colVertical->get_transform(), "B", 1, parent->getColor().b * 255, 0, 255, 0, [parent](float value){
+    colslider = BeatSaberUI::CreateSliderSetting(colVertical->get_transform(), "B", 1, parent->getColor().b * 255, 0, 255, 0, [parent](float value){
         parent->setColor({parent->getColor().r, parent->getColor().g, value/255, 1});
         parent->save();
     });
     colslider->get_transform()->get_parent()->get_gameObject()->GetComponent<UnityEngine::UI::LayoutElement*>()->set_preferredWidth(60);
-    reinterpret_cast<UnityEngine::RectTransform*>(colslider->slider->get_transform())->set_sizeDelta({56, 0});
+    ((UnityEngine::RectTransform*) colslider->slider->get_transform())->set_sizeDelta({56, 0});
     
     colVertical->get_gameObject()->set_active(false);
 
     // viewed settings change and lock/close buttons
-    closeButton = QuestUI::BeatSaberUI::CreateUIButton(get_transform(), "", "SettingsButton", [this](){
+    closeButton = BeatSaberUI::CreateUIButton(get_transform(), "", "SettingsButton", [this](){
         this->get_gameObject()->set_active(false);
     });
-    QuestUI::BeatSaberUI::SetButtonSprites(closeButton, MOD_INFO_SPRITE(close), MOD_INFO_SPRITE(closeActive));
-    reinterpret_cast<UnityEngine::RectTransform*>(closeButton->get_transform())->set_anchoredPosition({32, 7});
-    reinterpret_cast<UnityEngine::RectTransform*>(closeButton->get_transform()->GetChild(0))->set_sizeDelta({5.5, 5.5});
+    GET_SPRITE(close);
+    GET_SPRITE(closeActive);
+    BeatSaberUI::SetButtonSprites(closeButton, close_sprite, closeActive_sprite);
+    ((UnityEngine::RectTransform*) closeButton->get_transform())->set_anchoredPosition({32, 7});
+    ((UnityEngine::RectTransform*) closeButton->get_transform()->GetChild(0))->set_sizeDelta({5.5, 5.5});
 
-    auto col_button = QuestUI::BeatSaberUI::CreateUIButton(get_transform(), "", "ColorPickerButtonSecondary", [this](){
+    auto col_button = BeatSaberUI::CreateUIButton(get_transform(), "", "ColorPickerButtonSecondary", [this](){
         this->valVertical->get_gameObject()->set_active(!this->valVertical->get_gameObject()->get_active());
         this->colVertical->get_gameObject()->set_active(!this->colVertical->get_gameObject()->get_active());
     });
-    reinterpret_cast<UnityEngine::RectTransform*>(col_button->get_transform())->set_anchoredPosition({32, 0});
+    ((UnityEngine::RectTransform*) col_button->get_transform())->set_anchoredPosition({32, 0});
 
     colButtonController = col_button->GetComponent<GlobalNamespace::ColorPickerButtonController*>();
     colButtonController->SetColor(parent->getColor());
 
-    lockButton = QuestUI::BeatSaberUI::CreateUIButton(get_transform(), "", "SettingsButton", [this, parent](){
+    lockButton = BeatSaberUI::CreateUIButton(get_transform(), "", "SettingsButton", [this, parent](){
         parent->setLocked(!parent->getLocked());
         parent->save();
-        QuestUI::BeatSaberUI::SetButtonSprites(lockButton, parent->getLocked() ? MOD_INFO_SPRITE(lock) : MOD_INFO_SPRITE(unlock),
-            parent->getLocked() ? MOD_INFO_SPRITE(lockActive) : MOD_INFO_SPRITE(unlockActive));
+        if(parent->getLocked()) {
+            GET_SPRITE(lock);
+            GET_SPRITE(lockActive);
+            BeatSaberUI::SetButtonSprites(lockButton, lock_sprite, lockActive_sprite);
+        } else {
+            GET_SPRITE(unlock);
+            GET_SPRITE(unlockActive);
+            BeatSaberUI::SetButtonSprites(lockButton, unlock_sprite, unlockActive_sprite);
+        }
     });
-    QuestUI::BeatSaberUI::SetButtonSprites(lockButton, parent->getLocked() ? MOD_INFO_SPRITE(lock) : MOD_INFO_SPRITE(unlock),
-        parent->getLocked() ? MOD_INFO_SPRITE(lockActive) : MOD_INFO_SPRITE(unlockActive));
-    reinterpret_cast<UnityEngine::RectTransform*>(lockButton->get_transform())->set_anchoredPosition({32, -7});
-    reinterpret_cast<UnityEngine::RectTransform*>(lockButton->get_transform()->GetChild(0))->set_sizeDelta({5.5, 5.5});
+    if(parent->getLocked()) {
+        GET_SPRITE(lock);
+        GET_SPRITE(lockActive);
+        BeatSaberUI::SetButtonSprites(lockButton, lock_sprite, lockActive_sprite);
+    } else {
+        GET_SPRITE(unlock);
+        GET_SPRITE(unlockActive);
+        BeatSaberUI::SetButtonSprites(lockButton, unlock_sprite, unlockActive_sprite);
+    }
+    ((UnityEngine::RectTransform*) lockButton->get_transform())->set_anchoredPosition({32, -7});
+    ((UnityEngine::RectTransform*) lockButton->get_transform()->GetChild(0))->set_sizeDelta({5.5, 5.5});
 }
 #pragma endregion

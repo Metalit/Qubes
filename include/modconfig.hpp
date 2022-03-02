@@ -7,6 +7,8 @@
 
 #include "UnityEngine/GameObject.hpp"
 #include "UnityEngine/Color.hpp"
+#include "UnityEngine/Vector3.hpp"
+#include "UnityEngine/Quaternion.hpp"
 
 #include "config-utils/shared/config-utils.hpp"
 
@@ -14,9 +16,9 @@ namespace Qubes {
     class DefaultCube;
 
     struct CubeInfo {
-        float pos [3];
-        float rot [4];
-        float color [4];
+        UnityEngine::Vector3 pos;
+        UnityEngine::Quaternion rot;
+        UnityEngine::Color color;
         int type;
         int hitAction;
         float size;
